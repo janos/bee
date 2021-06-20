@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/syndtr/goleveldb/leveldb"
+	badger "github.com/dgraph-io/badger/v3"
 )
 
 // Uint64Field provides a way to have a simple counter in the database.
@@ -50,7 +50,7 @@ func (db *DB) NewUint64Field(name string) (f Uint64Field, err error) {
 func (f Uint64Field) Get() (val uint64, err error) {
 	b, err := f.db.Get(f.key)
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, ErrNotFound) {
 			return 0, nil
 		}
 		return 0, err
@@ -65,8 +65,8 @@ func (f Uint64Field) Put(val uint64) (err error) {
 
 // PutInBatch stores a uint64 value in a batch
 // that can be saved later in the database.
-func (f Uint64Field) PutInBatch(batch *leveldb.Batch, val uint64) {
-	batch.Put(f.key, encodeUint64(val))
+func (f Uint64Field) PutInBatch(batch *badger.Txn, val uint64) (err error) {
+	return batch.Set(f.key, encodeUint64(val))
 }
 
 // Inc increments a uint64 value in the database.
@@ -74,7 +74,7 @@ func (f Uint64Field) PutInBatch(batch *leveldb.Batch, val uint64) {
 func (f Uint64Field) Inc() (val uint64, err error) {
 	val, err = f.Get()
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, ErrNotFound) {
 			val = 0
 		} else {
 			return 0, fmt.Errorf("get value: %w", err)
@@ -87,10 +87,10 @@ func (f Uint64Field) Inc() (val uint64, err error) {
 // IncInBatch increments a uint64 value in the batch
 // by retreiving a value from the database, not the same batch.
 // This operation is not goroutine save.
-func (f Uint64Field) IncInBatch(batch *leveldb.Batch) (val uint64, err error) {
+func (f Uint64Field) IncInBatch(batch *badger.Txn) (val uint64, err error) {
 	val, err = f.Get()
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, ErrNotFound) {
 			val = 0
 		} else {
 			return 0, fmt.Errorf("get value: %w", err)
@@ -107,7 +107,7 @@ func (f Uint64Field) IncInBatch(batch *leveldb.Batch) (val uint64, err error) {
 func (f Uint64Field) Dec() (val uint64, err error) {
 	val, err = f.Get()
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, ErrNotFound) {
 			val = 0
 		} else {
 			return 0, fmt.Errorf("get value: %w", err)
@@ -123,10 +123,10 @@ func (f Uint64Field) Dec() (val uint64, err error) {
 // by retreiving a value from the database, not the same batch.
 // This operation is not goroutine save.
 // The field is protected from overflow to a negative value.
-func (f Uint64Field) DecInBatch(batch *leveldb.Batch) (val uint64, err error) {
+func (f Uint64Field) DecInBatch(batch *badger.Txn) (val uint64, err error) {
 	val, err = f.Get()
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, ErrNotFound) {
 			val = 0
 		} else {
 			return 0, fmt.Errorf("get value: %w", err)
@@ -135,7 +135,10 @@ func (f Uint64Field) DecInBatch(batch *leveldb.Batch) (val uint64, err error) {
 	if val != 0 {
 		val--
 	}
-	f.PutInBatch(batch, val)
+	err = f.PutInBatch(batch, val)
+	if err != nil {
+		return 0, err
+	}
 	return val, nil
 }
 

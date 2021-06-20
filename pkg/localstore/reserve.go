@@ -10,7 +10,6 @@ import (
 
 	"github.com/ethersphere/bee/pkg/shed"
 	"github.com/ethersphere/bee/pkg/swarm"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // UnreserveBatch atomically unpins chunks of a batch in proximity order upto and including po.
@@ -21,12 +20,12 @@ func (db *DB) UnreserveBatch(id []byte, radius uint8) (evicted uint64, err error
 		item = shed.Item{
 			BatchID: id,
 		}
-		batch     = new(leveldb.Batch)
+		batch     = db.shed.GetBatch(true)
 		oldRadius = radius
 	)
 	i, err := db.postageRadiusIndex.Get(item)
 	if err != nil {
-		if !errors.Is(err, leveldb.ErrNotFound) {
+		if !errors.Is(err, shed.ErrNotFound) {
 			return 0, err
 		}
 	} else {
@@ -40,7 +39,7 @@ func (db *DB) UnreserveBatch(id []byte, radius uint8) (evicted uint64, err error
 		addr := swarm.NewAddress(item.Address)
 		c, err := db.setUnpin(batch, addr)
 		if err != nil {
-			if !errors.Is(err, leveldb.ErrNotFound) {
+			if !errors.Is(err, shed.ErrNotFound) {
 				return false, fmt.Errorf("unpin: %w", err)
 			} else {
 				// this is possible when we are resyncing chain data after
@@ -82,7 +81,7 @@ func (db *DB) UnreserveBatch(id []byte, radius uint8) (evicted uint64, err error
 		if err := db.shed.WriteBatch(batch); err != nil {
 			return 0, err
 		}
-		batch = new(leveldb.Batch)
+		batch = db.shed.GetBatch(true)
 		gcSizeChange = 0
 	}
 
@@ -97,12 +96,12 @@ func (db *DB) UnreserveBatch(id []byte, radius uint8) (evicted uint64, err error
 	}
 
 	gcSize, err := db.gcSize.Get()
-	if err != nil && !errors.Is(err, leveldb.ErrNotFound) {
+	if err != nil && !errors.Is(err, shed.ErrNotFound) {
 		return 0, err
 	}
 
 	if reserveSizeChange > 0 {
-		batch = new(leveldb.Batch)
+		batch = db.shed.GetBatch(true)
 		if err := db.incReserveSizeInBatch(batch, -int64(reserveSizeChange)); err != nil {
 			return 0, err
 		}

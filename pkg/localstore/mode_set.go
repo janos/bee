@@ -21,11 +21,11 @@ import (
 	"errors"
 	"time"
 
+	"github.com/dgraph-io/badger/v3"
 	"github.com/ethersphere/bee/pkg/shed"
 	"github.com/ethersphere/bee/pkg/storage"
 	"github.com/ethersphere/bee/pkg/swarm"
 	"github.com/ethersphere/bee/pkg/tags"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // Set updates database indexes for
@@ -52,7 +52,7 @@ func (db *DB) set(mode storage.ModeSet, addrs ...swarm.Address) (err error) {
 		db.dirtyAddresses = append(db.dirtyAddresses, addrs...)
 	}
 
-	batch := new(leveldb.Batch)
+	batch := db.shed.GetBatch(true)
 
 	// variables that provide information for operations
 	// to be done after write batch function successfully executes
@@ -121,7 +121,7 @@ func (db *DB) set(mode storage.ModeSet, addrs ...swarm.Address) (err error) {
 //   from push sync index
 // - update to gc index happens given item does not exist in pin index
 // Provided batch is updated.
-func (db *DB) setSync(batch *leveldb.Batch, addr swarm.Address) (gcSizeChange int64, err error) {
+func (db *DB) setSync(batch *badger.Txn, addr swarm.Address) (gcSizeChange int64, err error) {
 	item := addressToItem(addr)
 
 	// need to get access timestamp here as it is not
@@ -130,7 +130,7 @@ func (db *DB) setSync(batch *leveldb.Batch, addr swarm.Address) (gcSizeChange in
 
 	i, err := db.retrievalDataIndex.Get(item)
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, shed.ErrNotFound) {
 			// chunk is not found,
 			// no need to update gc index
 			// just delete from the push index
@@ -151,7 +151,7 @@ func (db *DB) setSync(batch *leveldb.Batch, addr swarm.Address) (gcSizeChange in
 
 	i, err = db.pushIndex.Get(item)
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, shed.ErrNotFound) {
 			// we handle this error internally, since this is an internal inconsistency of the indices
 			// this error can happen if the chunk is put with ModePutRequest or ModePutSync
 			// but this function is called with ModeSetSync
@@ -181,7 +181,7 @@ func (db *DB) setSync(batch *leveldb.Batch, addr swarm.Address) (gcSizeChange in
 
 	i1, err := db.retrievalAccessIndex.Get(item)
 	if err != nil {
-		if !errors.Is(err, leveldb.ErrNotFound) {
+		if !errors.Is(err, shed.ErrNotFound) {
 			return 0, err
 		}
 		item.AccessTimestamp = now()
@@ -198,13 +198,13 @@ func (db *DB) setSync(batch *leveldb.Batch, addr swarm.Address) (gcSizeChange in
 // setRemove removes the chunk by updating indexes:
 //  - delete from retrieve, pull, gc
 // Provided batch is updated.
-func (db *DB) setRemove(batch *leveldb.Batch, item shed.Item, check bool) (gcSizeChange int64, err error) {
+func (db *DB) setRemove(batch *badger.Txn, item shed.Item, check bool) (gcSizeChange int64, err error) {
 	if item.AccessTimestamp == 0 {
 		i, err := db.retrievalAccessIndex.Get(item)
 		switch {
 		case err == nil:
 			item.AccessTimestamp = i.AccessTimestamp
-		case errors.Is(err, leveldb.ErrNotFound):
+		case errors.Is(err, shed.ErrNotFound):
 		default:
 			return 0, err
 		}
@@ -242,7 +242,7 @@ func (db *DB) setRemove(batch *leveldb.Batch, item shed.Item, check bool) (gcSiz
 	if check {
 		_, err := db.gcIndex.Get(item)
 		if err != nil {
-			if !errors.Is(err, leveldb.ErrNotFound) {
+			if !errors.Is(err, shed.ErrNotFound) {
 				return 0, err
 			}
 			return 0, db.pinIndex.DeleteInBatch(batch, item)
@@ -258,18 +258,18 @@ func (db *DB) setRemove(batch *leveldb.Batch, item shed.Item, check bool) (gcSiz
 // setPin increments pin counter for the chunk by updating
 // pin index and sets the chunk to be excluded from garbage collection.
 // Provided batch is updated.
-func (db *DB) setPin(batch *leveldb.Batch, item shed.Item) (gcSizeChange int64, err error) {
+func (db *DB) setPin(batch *badger.Txn, item shed.Item) (gcSizeChange int64, err error) {
 	// Get the existing pin counter of the chunk
 	i, err := db.pinIndex.Get(item)
 	item.PinCounter = i.PinCounter
 	if err != nil {
-		if !errors.Is(err, leveldb.ErrNotFound) {
+		if !errors.Is(err, shed.ErrNotFound) {
 			return 0, err
 		}
 		// if this Address is not pinned yet, then
 		i, err := db.retrievalAccessIndex.Get(item)
 		if err != nil {
-			if !errors.Is(err, leveldb.ErrNotFound) {
+			if !errors.Is(err, shed.ErrNotFound) {
 				return 0, err
 			}
 			// not synced yet
@@ -301,7 +301,7 @@ func (db *DB) setPin(batch *leveldb.Batch, item shed.Item) (gcSizeChange int64, 
 
 // setUnpin decrements pin counter for the chunk by updating pin index.
 // Provided batch is updated.
-func (db *DB) setUnpin(batch *leveldb.Batch, addr swarm.Address) (gcSizeChange int64, err error) {
+func (db *DB) setUnpin(batch *badger.Txn, addr swarm.Address) (gcSizeChange int64, err error) {
 	item := addressToItem(addr)
 
 	// Get the existing pin counter of the chunk
@@ -331,14 +331,14 @@ func (db *DB) setUnpin(batch *leveldb.Batch, addr swarm.Address) (gcSizeChange i
 	item.BinID = i.BinID
 	item.BatchID = i.BatchID
 	i, err = db.pushIndex.Get(item)
-	if !errors.Is(err, leveldb.ErrNotFound) {
-		// err is either nil or not leveldb.ErrNotFound
+	if !errors.Is(err, shed.ErrNotFound) {
+		// err is either nil or not shed.ErrNotFound
 		return 0, err
 	}
 
 	i, err = db.retrievalAccessIndex.Get(item)
 	if err != nil {
-		if !errors.Is(err, leveldb.ErrNotFound) {
+		if !errors.Is(err, shed.ErrNotFound) {
 			return 0, err
 		}
 		item.AccessTimestamp = now()

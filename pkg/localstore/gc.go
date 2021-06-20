@@ -20,9 +20,10 @@ import (
 	"errors"
 	"time"
 
+	badger "github.com/dgraph-io/badger/v3"
+
 	"github.com/ethersphere/bee/pkg/shed"
 	"github.com/ethersphere/bee/pkg/swarm"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 var (
@@ -98,7 +99,7 @@ func (db *DB) collectGarbage() (collectedCount uint64, done bool, err error) {
 		}
 		totalTimeMetric(db.metrics.TotalTimeCollectGarbage, start)
 	}(time.Now())
-	batch := new(leveldb.Batch)
+	batch := db.shed.GetBatch(true)
 	target := db.gcTarget()
 
 	// tell the localstore to start logging dirty addresses
@@ -255,12 +256,12 @@ func (db *DB) triggerReserveEviction() {
 // incGCSizeInBatch changes gcSize field value
 // by change which can be negative. This function
 // must be called under batchMu lock.
-func (db *DB) incGCSizeInBatch(batch *leveldb.Batch, change int64) (err error) {
+func (db *DB) incGCSizeInBatch(batch *badger.Txn, change int64) (err error) {
 	if change == 0 {
 		return nil
 	}
 	gcSize, err := db.gcSize.Get()
-	if err != nil && !errors.Is(err, leveldb.ErrNotFound) {
+	if err != nil && !errors.Is(err, shed.ErrNotFound) {
 		return err
 	}
 
@@ -290,12 +291,12 @@ func (db *DB) incGCSizeInBatch(batch *leveldb.Batch, change int64) (err error) {
 // incReserveSizeInBatch changes reserveSize field value
 // by change which can be negative. This function
 // must be called under batchMu lock.
-func (db *DB) incReserveSizeInBatch(batch *leveldb.Batch, change int64) (err error) {
+func (db *DB) incReserveSizeInBatch(batch *badger.Txn, change int64) (err error) {
 	if change == 0 {
 		return nil
 	}
 	reserveSize, err := db.reserveSize.Get()
-	if err != nil && !errors.Is(err, leveldb.ErrNotFound) {
+	if err != nil && !errors.Is(err, shed.ErrNotFound) {
 		return err
 	}
 

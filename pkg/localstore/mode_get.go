@@ -25,7 +25,6 @@ import (
 	"github.com/ethersphere/bee/pkg/shed"
 	"github.com/ethersphere/bee/pkg/storage"
 	"github.com/ethersphere/bee/pkg/swarm"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // Get returns a chunk from the database. If the chunk is
@@ -45,7 +44,7 @@ func (db *DB) Get(ctx context.Context, mode storage.ModeGet, addr swarm.Address)
 
 	out, err := db.get(mode, addr)
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, shed.ErrNotFound) {
 			return nil, storage.ErrNotFound
 		}
 		return nil, err
@@ -130,7 +129,7 @@ func (db *DB) updateGC(item shed.Item) (err error) {
 		db.dirtyAddresses = append(db.dirtyAddresses, swarm.NewAddress(item.Address))
 	}
 
-	batch := new(leveldb.Batch)
+	batch := db.shed.GetBatch(true)
 
 	// update accessTimeStamp in retrieve, gc
 
@@ -138,7 +137,7 @@ func (db *DB) updateGC(item shed.Item) (err error) {
 	switch {
 	case err == nil:
 		item.AccessTimestamp = i.AccessTimestamp
-	case errors.Is(err, leveldb.ErrNotFound):
+	case errors.Is(err, shed.ErrNotFound):
 		// no chunk accesses
 	default:
 		return err
@@ -163,7 +162,7 @@ func (db *DB) updateGC(item shed.Item) (err error) {
 		if err != nil {
 			return err
 		}
-	} else if !errors.Is(err, leveldb.ErrNotFound) {
+	} else if !errors.Is(err, shed.ErrNotFound) {
 		return err
 	}
 	// if the item is not in the gc we don't

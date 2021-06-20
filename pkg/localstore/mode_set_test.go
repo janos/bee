@@ -20,9 +20,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ethersphere/bee/pkg/shed"
 	"github.com/ethersphere/bee/pkg/storage"
 	"github.com/ethersphere/bee/pkg/swarm"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // TestModeSetRemove validates ModeSetRemove index values on the provided DB.
@@ -50,7 +50,7 @@ func TestModeSetRemove(t *testing.T) {
 			})
 
 			for _, ch := range chunks {
-				newPullIndexTest(db, ch, 0, leveldb.ErrNotFound)(t)
+				newPullIndexTest(db, ch, 0, shed.ErrNotFound)(t)
 			}
 
 			t.Run("pull index count", newItemsCountTest(db.pullIndex, 0))

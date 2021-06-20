@@ -31,7 +31,6 @@ import (
 	"github.com/ethersphere/bee/pkg/shed"
 	"github.com/ethersphere/bee/pkg/storage"
 	"github.com/ethersphere/bee/pkg/swarm"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 var putModes = []storage.ModePut{
@@ -173,7 +172,7 @@ func TestModePutRequestCache(t *testing.T) {
 
 			for _, ch := range chunks {
 				newRetrieveIndexesTestWithAccess(db, ch, wantTimestamp, wantTimestamp)(t)
-				newPinIndexTest(db, ch, leveldb.ErrNotFound)(t)
+				newPinIndexTest(db, ch, shed.ErrNotFound)(t)
 			}
 
 			newItemsCountTest(db.postageChunksIndex, tc.count)(t)
@@ -215,7 +214,8 @@ func TestModePutSync(t *testing.T) {
 
 				newRetrieveIndexesTestWithAccess(db, ch, wantTimestamp, wantTimestamp)(t)
 				newPullIndexTest(db, ch, binIDs[po], nil)(t)
-				newPinIndexTest(db, ch, leveldb.ErrNotFound)(t)
+				newItemsCountTest(db.gcIndex, tc.count)(t)
+				newPinIndexTest(db, ch, shed.ErrNotFound)(t)
 				newIndexGCSizeTest(db)(t)
 			}
 			newItemsCountTest(db.postageChunksIndex, tc.count)(t)
@@ -257,7 +257,7 @@ func TestModePutUpload(t *testing.T) {
 				newRetrieveIndexesTest(db, ch, wantTimestamp, 0)(t)
 				newPullIndexTest(db, ch, binIDs[po], nil)(t)
 				newPushIndexTest(db, ch, wantTimestamp, nil)(t)
-				newPinIndexTest(db, ch, leveldb.ErrNotFound)(t)
+				newPinIndexTest(db, ch, shed.ErrNotFound)(t)
 			}
 			newItemsCountTest(db.postageIndexIndex, tc.count)(t)
 		})

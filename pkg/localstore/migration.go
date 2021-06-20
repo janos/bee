@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/ethersphere/bee/pkg/shed"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 var errMissingCurrentSchema = errors.New("could not find current db schema")
@@ -109,7 +108,7 @@ func getMigrations(currentSchema, targetSchema string, allSchemeMigrations []mig
 func truncateIndex(db *DB, idx shed.Index) (n int, err error) {
 	const maxBatchSize = 10000
 
-	batch := new(leveldb.Batch)
+	batch := db.shed.GetBatch(true)
 	if err = idx.Iterate(func(item shed.Item) (stop bool, err error) {
 		if err = idx.DeleteInBatch(batch, item); err != nil {
 			return true, err
@@ -122,7 +121,8 @@ func truncateIndex(db *DB, idx shed.Index) (n int, err error) {
 			if err != nil {
 				return true, err
 			}
-			batch.Reset()
+
+			batch = db.shed.GetBatch(true)
 		}
 
 		return false, nil

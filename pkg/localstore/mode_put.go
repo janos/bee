@@ -22,10 +22,10 @@ import (
 	"errors"
 	"time"
 
+	badger "github.com/dgraph-io/badger/v3"
 	"github.com/ethersphere/bee/pkg/shed"
 	"github.com/ethersphere/bee/pkg/storage"
 	"github.com/ethersphere/bee/pkg/swarm"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 var (
@@ -79,7 +79,7 @@ func (db *DB) put(mode storage.ModePut, chs ...swarm.Chunk) (exist []bool, err e
 		}
 	}
 
-	batch := new(leveldb.Batch)
+	batch := db.shed.GetBatch(true)
 
 	// variables that provide information for operations
 	// to be done after write batch function successfully executes
@@ -192,7 +192,7 @@ func (db *DB) put(mode storage.ModePut, chs ...swarm.Chunk) (exist []bool, err e
 //  - it does not enter the syncpool
 // The batch can be written to the database.
 // Provided batch and binID map are updated.
-func (db *DB) putRequest(batch *leveldb.Batch, binIDs map[uint8]uint64, item shed.Item, forcePin, forceCache bool) (exists bool, gcSizeChange int64, err error) {
+func (db *DB) putRequest(batch *badger.Txn, binIDs map[uint8]uint64, item shed.Item, forcePin, forceCache bool) (exists bool, gcSizeChange int64, err error) {
 	exists, err = db.retrievalDataIndex.Has(item)
 	if err != nil {
 		return false, 0, err
@@ -203,7 +203,7 @@ func (db *DB) putRequest(batch *leveldb.Batch, binIDs map[uint8]uint64, item she
 
 	previous, err := db.postageIndexIndex.Get(item)
 	if err != nil {
-		if !errors.Is(err, leveldb.ErrNotFound) {
+		if !errors.Is(err, shed.ErrNotFound) {
 			return false, 0, err
 		}
 	} else {
@@ -221,7 +221,7 @@ func (db *DB) putRequest(batch *leveldb.Batch, binIDs map[uint8]uint64, item she
 		}
 		radius, err := db.postageRadiusIndex.Get(item)
 		if err != nil {
-			if !errors.Is(err, leveldb.ErrNotFound) {
+			if !errors.Is(err, shed.ErrNotFound) {
 				return false, 0, err
 			}
 		} else {
@@ -278,7 +278,7 @@ func (db *DB) putRequest(batch *leveldb.Batch, binIDs map[uint8]uint64, item she
 //  - put to indexes: retrieve, push, pull
 // The batch can be written to the database.
 // Provided batch and binID map are updated.
-func (db *DB) putUpload(batch *leveldb.Batch, binIDs map[uint8]uint64, item shed.Item) (exists bool, gcSizeChange int64, err error) {
+func (db *DB) putUpload(batch *badger.Txn, binIDs map[uint8]uint64, item shed.Item) (exists bool, gcSizeChange int64, err error) {
 	exists, err = db.retrievalDataIndex.Has(item)
 	if err != nil {
 		return false, 0, err
@@ -289,7 +289,7 @@ func (db *DB) putUpload(batch *leveldb.Batch, binIDs map[uint8]uint64, item shed
 
 	previous, err := db.postageIndexIndex.Get(item)
 	if err != nil {
-		if !errors.Is(err, leveldb.ErrNotFound) {
+		if !errors.Is(err, shed.ErrNotFound) {
 			return false, 0, err
 		}
 	} else {
@@ -339,7 +339,7 @@ func (db *DB) putUpload(batch *leveldb.Batch, binIDs map[uint8]uint64, item shed
 //  - put to indexes: retrieve, pull, gc
 // The batch can be written to the database.
 // Provided batch and binID map are updated.
-func (db *DB) putSync(batch *leveldb.Batch, binIDs map[uint8]uint64, item shed.Item) (exists bool, gcSizeChange int64, err error) {
+func (db *DB) putSync(batch *badger.Txn, binIDs map[uint8]uint64, item shed.Item) (exists bool, gcSizeChange int64, err error) {
 	exists, err = db.retrievalDataIndex.Has(item)
 	if err != nil {
 		return false, 0, err
@@ -350,7 +350,7 @@ func (db *DB) putSync(batch *leveldb.Batch, binIDs map[uint8]uint64, item shed.I
 
 	previous, err := db.postageIndexIndex.Get(item)
 	if err != nil {
-		if !errors.Is(err, leveldb.ErrNotFound) {
+		if !errors.Is(err, shed.ErrNotFound) {
 			return false, 0, err
 		}
 	} else {
@@ -368,7 +368,7 @@ func (db *DB) putSync(batch *leveldb.Batch, binIDs map[uint8]uint64, item shed.I
 		}
 		radius, err := db.postageRadiusIndex.Get(item)
 		if err != nil {
-			if !errors.Is(err, leveldb.ErrNotFound) {
+			if !errors.Is(err, shed.ErrNotFound) {
 				return false, 0, err
 			}
 		} else {
@@ -417,7 +417,7 @@ func (db *DB) putSync(batch *leveldb.Batch, binIDs map[uint8]uint64, item shed.I
 
 // preserveOrCache is a helper function used to add chunks to either a pinned reserve or gc cache
 // (the retrieval access index and the gc index)
-func (db *DB) preserveOrCache(batch *leveldb.Batch, item shed.Item, forcePin, forceCache bool) (gcSizeChange int64, err error) {
+func (db *DB) preserveOrCache(batch *badger.Txn, item shed.Item, forcePin, forceCache bool) (gcSizeChange int64, err error) {
 	if !forceCache && (withinRadiusFn(db, item) || forcePin) {
 		if !forcePin {
 			if err := db.incReserveSizeInBatch(batch, 1); err != nil {
@@ -436,7 +436,7 @@ func (db *DB) preserveOrCache(batch *leveldb.Batch, item shed.Item, forcePin, fo
 		return gcSizeChange, nil
 	}
 	exists, err := db.gcIndex.Has(item)
-	if err != nil && !errors.Is(err, leveldb.ErrNotFound) {
+	if err != nil && !errors.Is(err, shed.ErrNotFound) {
 		return 0, err
 	}
 	if exists {
