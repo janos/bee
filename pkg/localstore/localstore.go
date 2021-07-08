@@ -556,7 +556,7 @@ func New(path string, baseKey []byte, ss storage.StateStorer, o *Options, logger
 				panic(err)
 			}
 			logger.Infof("INDICES INFO: %v", ii)
-			time.Sleep(5*time.Second)
+			time.Sleep(5 * time.Second)
 		}
 	}()
 
