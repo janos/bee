@@ -40,11 +40,11 @@ import (
 )
 
 // DefaultDepth is the initial depth for the reserve
-var DefaultDepth = uint8(2) // 12 is the testnet depth at the time of merging to master
+var DefaultDepth = uint8(12) // 12 is the testnet depth at the time of merging to master
 
 // Capacity is the number of chunks in reserve. `2^22` (4194304) was chosen to remain
 // relatively near the current 5M chunks ~25GB.
-var Capacity = exp2(4) //; exp2(16)
+var Capacity = exp2(22)
 
 var big1 = big.NewInt(1)
 
@@ -351,7 +351,7 @@ func (s *store) evictOuter(last *postage.Batch) error {
 			return true, nil
 		}
 		// unreserve outer PO of the lowest priority batch  until capacity is back to positive
-		s.logger.Debugf("set available from: %v; exp2: %v; %v, %v", s.rs.Available, exp2(uint(b.Depth) - uint(s.rs.Radius) - 1), b.Depth, b.Radius)
+		s.logger.Debugf("set available from: %v; exp2: %v; %v, %v", s.rs.Available, exp2(uint(b.Depth)-uint(s.rs.Radius)-1), b.Depth, b.Radius)
 		s.rs.Available += s.exp2(uint(b.Depth) - uint(s.rs.Radius) - 1)
 		s.logger.Debugf("set available to: %v", s.rs.Available)
 		s.rs.Outer.Set(b.Value)
@@ -416,5 +416,5 @@ func (s *store) exp2(e uint) int64 {
 
 // exp2 returns the e-th power of 2
 func exp2(e uint) int64 {
-	return 1<<e
+	return 1 << e
 }
