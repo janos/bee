@@ -169,7 +169,7 @@ func (l *listener) Listen(from uint64, updater postage.EventUpdater) <-chan stru
 		cancel()
 	}()
 
-	chainUpdateInterval := (time.Duration(l.blockTime) * time.Second) / 2
+	chainUpdateInterval := (time.Duration(l.blockTime) * time.Second) / 5
 
 	synced := make(chan struct{})
 	closeOnce := new(sync.Once)

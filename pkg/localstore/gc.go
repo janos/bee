@@ -280,6 +280,8 @@ func (db *DB) incGCSizeInBatch(batch *leveldb.Batch, change int64) (err error) {
 	db.gcSize.PutInBatch(batch, newSize)
 	db.metrics.GCSize.Set(float64(newSize))
 
+	db.logger.Debugf("gc size change from %v to %v; current cache capacity", gcSize, newSize, db.cacheCapacity)
+
 	// trigger garbage collection if we reached the capacity
 	if newSize >= db.cacheCapacity {
 		db.triggerGarbageCollection()
@@ -326,7 +328,9 @@ func (db *DB) reserveEvictionWorker() {
 	for {
 		select {
 		case <-db.reserveEvictionTrigger:
+			db.logger.Infof("localstore: evict reserve triggered")
 			evictedCount, done, err := db.evictReserve()
+			db.logger.Infof("localstore: evict reserve done")
 			if err != nil {
 				db.logger.Errorf("localstore: evict reserve: %v", err)
 			}
@@ -369,7 +373,9 @@ func (db *DB) evictReserve() (totalEvicted uint64, done bool, err error) {
 	totalCallbacks := 0
 	err = db.unreserveFunc(func(batchID []byte, radius uint8) (bool, error) {
 		totalCallbacks++
+		db.logger.Infof("unreserve batch start: batch %x, radius %v", batchID, radius)
 		e, err := db.UnreserveBatch(batchID, radius)
+		db.logger.Infof("unreserve batch finish: evicted %v", e)
 		if err != nil {
 			return true, err
 		}

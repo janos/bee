@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ethersphere/bee/pkg/logging"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 )
@@ -323,6 +324,8 @@ type IterateOptions struct {
 	Prefix []byte
 	// Iterate over items in reverse order.
 	Reverse bool
+
+	Logger logging.Logger
 }
 
 // Iterate function iterates over keys of the Index.
@@ -335,6 +338,11 @@ func (f Index) Iterate(fn IndexIterFunc, options *IterateOptions) (err error) {
 	prefix := append(f.prefix, options.Prefix...)
 	// start from the prefix
 	startKey := prefix
+
+	if options.Logger != nil {
+		options.Logger.Debugf("iterate options: %#v", options)
+	}
+
 	if options.StartFrom != nil {
 		// start from the provided StartFrom Item key value
 		startKey, err = f.encodeKeyFunc(*options.StartFrom)
@@ -402,8 +410,17 @@ func (f Index) Iterate(fn IndexIterFunc, options *IterateOptions) (err error) {
 		// and it is explicitly configured to skip it
 		ok = itSeekerFn()
 	}
+
+	if options.Logger != nil {
+		options.Logger.Debugf("seeker ok: %v", ok)
+	}
+
 	for ; ok; ok = itSeekerFn() {
 		item, err := f.itemFromIterator(it, prefix)
+		if options.Logger != nil {
+			options.Logger.Debugf("item from iterator key: %s; prefix: %s", string(it.Key()), string(prefix))
+			options.Logger.Debugf("item from iterator error: %v", err)
+		}
 		if err != nil {
 			if errors.Is(err, leveldb.ErrNotFound) {
 				break

@@ -549,6 +549,17 @@ func New(path string, baseKey []byte, ss storage.StateStorer, o *Options, logger
 		return nil, err
 	}
 
+	go func() {
+		for {
+			ii, err := db.DebugIndices()
+			if err != nil {
+				panic(err)
+			}
+			logger.Infof("INDICES INFO: %v", ii)
+			time.Sleep(5*time.Second)
+		}
+	}()
+
 	// start garbage collection worker
 	go db.collectGarbageWorker()
 	go db.reserveEvictionWorker()
