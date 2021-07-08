@@ -18,7 +18,7 @@ const (
 	postagePrefix = "postage"
 	// blockThreshold is used to allow threshold no of blocks to be synced before a
 	// batch is usable.
-	blockThreshold = 0
+	blockThreshold = 10
 )
 
 var (
