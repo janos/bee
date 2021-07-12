@@ -529,7 +529,7 @@ func (k *Kad) manage() {
 			default:
 			}
 
-			if k.standalone {
+			if k.standalone || k.bootnode {
 				continue
 			}
 
