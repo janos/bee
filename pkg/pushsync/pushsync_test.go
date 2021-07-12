@@ -94,6 +94,7 @@ func TestPushClosest(t *testing.T) {
 
 	// this intercepts the incoming receipt message
 	waitOnRecordAndTest(t, closestPeer, recorder, chunk.Address(), nil)
+
 	balance, err := pivotAccounting.Balance(closestPeer)
 	if err != nil {
 		t.Fatal(err)
@@ -779,6 +780,7 @@ func TestSignsReceipt(t *testing.T) {
 		t.Fatal("receipt block hash do not match")
 	}
 }
+
 func TestPeerSkipList(t *testing.T) {
 
 	skipList := pushsync.NewPeerSkipList()
