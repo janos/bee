@@ -148,6 +148,7 @@ type Options struct {
 	Transaction                string
 	BlockHash                  string
 	PostageContractAddress     string
+	DefaultPostageBatchId      string
 	PriceOracleAddress         string
 	BlockTime                  uint64
 	DeployGasPrice             string

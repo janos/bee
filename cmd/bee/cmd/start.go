@@ -194,6 +194,7 @@ inability to use, or your interaction with other nodes or the software.`)
 				Transaction:                c.config.GetString(optionNameTransactionHash),
 				BlockHash:                  c.config.GetString(optionNameBlockHash),
 				PostageContractAddress:     c.config.GetString(optionNamePostageContractAddress),
+				DefaultPostageBatchId:      c.config.GetString(optionNameDefaultPostageBatchId),
 				PriceOracleAddress:         c.config.GetString(optionNamePriceOracleAddress),
 				BlockTime:                  networkConfig.blockTime,
 				DeployGasPrice:             c.config.GetString(optionNameSwapDeploymentGasPrice),
